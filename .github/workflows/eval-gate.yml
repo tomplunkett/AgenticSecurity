@@ -1,0 +1,23 @@
+name: Agent Safety & Eval Gate
+
+on:
+  pull_request:
+    paths:
+      - 'agent_prompt.txt'
+      - 'test_cases.json'
+      - 'run_evals.py'
+
+jobs:
+  agent-evaluation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run Prompt & Safety Evals
+        run: python run_evals.py
