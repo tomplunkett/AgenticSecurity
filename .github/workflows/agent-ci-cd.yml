@@ -1,0 +1,67 @@
+name: Agent DevSecOps Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-scan:
+    name: 1. Build & Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run Supply Chain Audit
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt
+
+  eval-safety-gate:
+    name: 2. Safety Evals & Regression Gate
+    needs: build-and-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Execute Evals
+        run: python run_evals.py
+
+  deploy-canary-staging:
+    name: 3. Canary Deploy to Staging
+    needs: eval-safety-gate
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy Staging Canary
+        run: |
+          echo "Deploying Agent container with 10% canary traffic allocation to Staging..."
+          sleep 3
+
+  canary-health-probe:
+    name: 4. Canary Verification Probe
+    needs: deploy-canary-staging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify Staging Health
+        run: python health_check.py
+
+  promote-to-production:
+    name: 5. Promote to Production
+    needs: canary-health-probe
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Route 100% Traffic to Production
+        run: |
+          echo "Canary verified. Shifting 100% production traffic to new Agent release."
+          echo "Production deployment complete."
